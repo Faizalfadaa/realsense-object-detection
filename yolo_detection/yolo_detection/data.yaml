@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['10000', '100000', '2000', '5000', '50000']
+
+roboflow:
+  workspace: dharmans
+  project: depth-camera-object-detection-4ffuu
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/dharmans/depth-camera-object-detection-4ffuu/dataset/2
