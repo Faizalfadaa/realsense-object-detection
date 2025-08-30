@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["PYTORCH_FORCE_CPU"] = "1"
+
 import cv2
 import rclpy
 from rclpy.node import Node
@@ -8,7 +13,7 @@ from std_msgs.msg import Int64, String
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 
-class YoloNode(Node):
+class NodeTemplate(Node):
     def __init__(self):
         super().__init__('YoloNode')
 
@@ -18,7 +23,7 @@ class YoloNode(Node):
 
         # Declare parameters for topic names
         self.declare_parameter('color_image_raw_topic','/camera/camera/color/image_raw') # msg type sensor_msgs/msg/Image -> Menerima gambar dari Depth Camera
-        self.declare_parameter('detection_model', '/home/alfadha/ros2_ws/src/realsense-object-detection/yolo_detection/yolo_detection/yolov8n.pt')
+        self.declare_parameter('detection_model', '/home/alfadha/ros2_ws/src/realsense-object-detection/yolo_detection/yolo_detection/runs/detect/train/weights/best.pt')
         self.declare_parameter('threshold_val', 0.45)
         self.declare_parameter('result_image_topic', 'money_detect/image')
         self.declare_parameter('count_money_topic', 'money_detect/count')
@@ -40,6 +45,7 @@ class YoloNode(Node):
         self.conf = float(threshold_val)
 
         self.detection_model = YOLO(detection_model)
+        self.detection_model.to('cpu')
         self.bridge = CvBridge()
 
         # ==============================================
@@ -81,7 +87,7 @@ class YoloNode(Node):
     
     def color_image_raw_callback(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg,'bgr8')
-        result = self.model(frame, conf= self.conf, verbose= False)[0]
+        result = self.detection_model(frame, conf= self.conf, verbose= False, device="cpu")[0]
 
         money_value = {
             '2000': 2000,
@@ -98,20 +104,20 @@ class YoloNode(Node):
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
             cls_id = int(box.cls[0].item())
-            label = self.model.names[cls_id]
+            label = self.detection_model.names[cls_id]
 
             nominal = money_value.get(label, 0)  
             total += nominal
             n += 1
 
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0,255,0), 2)
-            cv2.putText(img, f'{label} ({nominal:,})', (x1, max(0, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+            cv2.putText(frame, f'{label} ({nominal:,})', (x1, max(0, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
 
-        cv2.putText(img, f'Count: {n}   Total: Rp {total:,}', (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50,200,50), 2)
+        cv2.putText(frame, f'Count: {n}   Total: Rp {total:,}', (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50,200,50), 2)
 
-        self.result_image_pub.publish(self.bridge.cv2_to_imgmsg(img, 'bgr8'))
-        self.count_money_pub.publish(Int64(n))
-        self.total_money_pub.publish(Int64(total))            
+        self.result_image_pub.publish(self.bridge.cv2_to_imgmsg(frame, 'bgr8'))
+        self.count_money_pub.publish(Int64(data= n))
+        self.total_money_pub.publish(Int64(data= total))            
 
         # ==================================================
         # TIMER CALLBACK
