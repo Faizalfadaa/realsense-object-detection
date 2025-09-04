@@ -84,7 +84,7 @@ class NodeTemplate(Node):
         # ==================================================
         # SUBSCRIBER CALLBACK
         # ==================================================
-    
+
     def color_image_raw_callback(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg,'bgr8')
         result = self.detection_model(frame, conf= self.conf, verbose= False, device="cpu")[0]
